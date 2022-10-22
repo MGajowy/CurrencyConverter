@@ -22,7 +22,7 @@ public class CurrencyController {
     }
 
     @GetMapping(CurrencyConstant.CURRENCY_CONVERT)
-    public Double convert(@RequestBody Currency currencyRequest) throws URISyntaxException, IOException, InterruptedException {
+    public String convert(@RequestBody Currency currencyRequest) throws URISyntaxException, IOException, InterruptedException {
         return currencyService.convert(currencyRequest);
     }
 
