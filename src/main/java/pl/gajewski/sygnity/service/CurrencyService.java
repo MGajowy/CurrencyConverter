@@ -1,6 +1,7 @@
 package pl.gajewski.sygnity.service;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -31,11 +32,9 @@ public class CurrencyService implements CurrencyApiNbp {
     private String hostApiNBP;
     private Double currencyPrice;
     private final CurrencyRepository repo;
-    private final Gson gson;
 
-    public CurrencyService(CurrencyRepository repo, Gson gson) {
+    public CurrencyService(CurrencyRepository repo) {
         this.repo = repo;
-        this.gson = gson;
     }
 
     public ResponseEntity<String> convert(Currency currencyRequest)
@@ -64,6 +63,7 @@ public class CurrencyService implements CurrencyApiNbp {
     @Override
     public Double getConversionResult(Currency currencyRequest, Double actualPriceInPLN, CurrencyOB currencyOBTarget)
             throws URISyntaxException, IOException, InterruptedException {
+        Gson gson = new GsonBuilder().create();
         Double result = null;
         if (currencyOBTarget != null) {
             result = actualPriceInPLN / currencyOBTarget.getMid();
@@ -87,6 +87,7 @@ public class CurrencyService implements CurrencyApiNbp {
     @Override
     public Double calculateAmountInPLN(Currency currencyRequest, CurrencyOB currencyOBSource)
             throws URISyntaxException, IOException, InterruptedException {
+        Gson gson = new GsonBuilder().create();
         Double result = null;
         if (currencyOBSource != null) {
             result = currencyOBSource.getMid() * currencyRequest.getAmountInSourceCurrency();
