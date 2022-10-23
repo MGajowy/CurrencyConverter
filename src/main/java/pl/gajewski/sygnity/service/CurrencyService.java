@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import pl.gajewski.sygnity.apiNbp.Currency;
+import pl.gajewski.sygnity.apiNbp.CurrencyApiNbp;
 import pl.gajewski.sygnity.apiNbp.Rate;
 import pl.gajewski.sygnity.apiNbp.Transcript;
 import pl.gajewski.sygnity.db.entity.CurrencyOB;
@@ -24,58 +25,82 @@ import java.util.Optional;
 
 @Service
 @Log4j2
-public class CurrencyService {
+public class CurrencyService implements CurrencyApiNbp {
 
     @Value("${currencyService.host}")
     private String hostApiNBP;
     private Double currencyPrice;
     private final CurrencyRepository repo;
+    private final Gson gson;
 
-    public CurrencyService(CurrencyRepository repo) {
+    public CurrencyService(CurrencyRepository repo, Gson gson) {
         this.repo = repo;
+        this.gson = gson;
     }
 
-    public String convert(Currency currencyRequest) throws URISyntaxException, IOException, InterruptedException {
-        Double response = null;
-        Double currentValueInPLN = null;
+    public ResponseEntity<String> convert(Currency currencyRequest)
+            throws URISyntaxException, IOException, InterruptedException {
+        Double conversionResult;
         boolean validation = validation(currencyRequest);
 
-            //todo obsłużyć 404
         if (validation) {
-            CurrencyOB currencyOBSource = repo.findByCodeAndEffectiveDate(currencyRequest.getSourceCurrencyCode(), currencyRequest.getConversionDate());
-            CurrencyOB currencyOBTarget = repo.findByCodeAndEffectiveDate(currencyRequest.getTargetCurrencyCode(), currencyRequest.getConversionDate());
+            CurrencyOB currencyOBSource = repo.findByCodeAndEffectiveDate(
+                    currencyRequest.getSourceCurrencyCode(),
+                    currencyRequest.getConversionDate());
+            CurrencyOB currencyOBTarget = repo.findByCodeAndEffectiveDate(
+                    currencyRequest.getTargetCurrencyCode(),
+                    currencyRequest.getConversionDate());
 
-            currentValueInPLN = calculateAmountInPLN(currencyRequest, currencyOBSource);
-            response = getConversionResult(currencyRequest, currentValueInPLN, currencyOBTarget);
+            Double currentValueInPLN = calculateAmountInPLN(currencyRequest, currencyOBSource);
+            conversionResult = getConversionResult(currencyRequest, currentValueInPLN, currencyOBTarget);
+            if (currentValueInPLN != null && conversionResult != null) {
+                return ResponseEntity.status(HttpStatus.OK).body(new DecimalFormat("##.##").format(conversionResult) +
+                        " " + currencyRequest.getTargetCurrencyCode());
+            }
         }
-     return new DecimalFormat("##.##").format(response);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not found");
     }
 
-    private Double getConversionResult(Currency currencyRequest, Double actualPriceInPLN, CurrencyOB currencyOBTarget) throws URISyntaxException, IOException, InterruptedException {
-        Double response;
-        Double targetCurrencyPrice;
+    @Override
+    public Double getConversionResult(Currency currencyRequest, Double actualPriceInPLN, CurrencyOB currencyOBTarget)
+            throws URISyntaxException, IOException, InterruptedException {
+        Double result = null;
         if (currencyOBTarget != null) {
-            response = actualPriceInPLN / currencyOBTarget.getMid();
+            result = actualPriceInPLN / currencyOBTarget.getMid();
         } else {
-            Transcript currency = getCurrencyFromApiNBP(currencyRequest.getTargetCurrencyCode(), currencyRequest.getConversionDate());
-            saveCurrencyToDB(currency);
-            Optional<Double> first = currency.getRates().stream().map(Rate::getMid).findFirst();
-            targetCurrencyPrice = first.get();
-            response = actualPriceInPLN / targetCurrencyPrice;
-            log.info("Currency collection " + currencyRequest.getTargetCurrencyCode() + " for day " + currencyRequest.getConversionDate());
+            HttpResponse<String> getResponse = getCurrencyFromApiNBP(
+                    currencyRequest.getTargetCurrencyCode(),
+                    currencyRequest.getConversionDate());
+            if (getResponse.statusCode() == 200) {
+                Transcript currency = gson.fromJson(getResponse.body(), Transcript.class);
+                saveCurrencyToDB(currency);
+                Optional<Double> first = currency.getRates().stream().map(Rate::getMid).findFirst();
+                Double targetCurrencyPrice = first.get();
+                result = actualPriceInPLN / targetCurrencyPrice;
+                log.info("Currency collection " + currencyRequest.getTargetCurrencyCode() + " for day " +
+                        currencyRequest.getConversionDate());
+            }
         }
-        return response;
+        return result;
     }
 
-    private Double calculateAmountInPLN(Currency currencyRequest, CurrencyOB currencyOBSource) throws URISyntaxException, IOException, InterruptedException {
-        Double result;
+    @Override
+    public Double calculateAmountInPLN(Currency currencyRequest, CurrencyOB currencyOBSource)
+            throws URISyntaxException, IOException, InterruptedException {
+        Double result = null;
         if (currencyOBSource != null) {
             result = currencyOBSource.getMid() * currencyRequest.getAmountInSourceCurrency();
         } else {
-            Transcript currency = getCurrencyFromApiNBP(currencyRequest.getSourceCurrencyCode(), currencyRequest.getConversionDate());
-            saveCurrencyToDB(currency);
-            result = currencyPrice * currencyRequest.getAmountInSourceCurrency();
-            log.info("Currency collection " + currencyRequest.getSourceCurrencyCode() + " for day " + currencyRequest.getConversionDate());
+            HttpResponse<String> getResponse = getCurrencyFromApiNBP(
+                    currencyRequest.getSourceCurrencyCode(),
+                    currencyRequest.getConversionDate());
+            if (getResponse.statusCode() == 200) {
+                Transcript currency = gson.fromJson(getResponse.body(), Transcript.class);
+                saveCurrencyToDB(currency);
+                result = currencyPrice * currencyRequest.getAmountInSourceCurrency();
+                log.info("Currency collection " + currencyRequest.getSourceCurrencyCode() + " for day " +
+                        currencyRequest.getConversionDate());
+            }
         }
         return result;
     }
@@ -99,24 +124,17 @@ public class CurrencyService {
         return false;
     }
 
-    private Transcript getCurrencyFromApiNBP(String code, String date) throws URISyntaxException, IOException, InterruptedException {
+    @Override
+    public HttpResponse<String> getCurrencyFromApiNBP(String code, String date)
+            throws URISyntaxException, IOException, InterruptedException {
         HttpClient httpClient = HttpClient.newHttpClient();
-        Gson gson = new Gson();
-        StringBuilder stringBuilderURL = new StringBuilder(hostApiNBP);
-        stringBuilderURL.append("/" + code);
-        stringBuilderURL.append("/" + date + "/");
+        String apiEndpoint = hostApiNBP + "/" + code +
+                "/" + date + "/";
         HttpRequest getRequest = HttpRequest.newBuilder()
-                .uri(new URI(stringBuilderURL.toString()))
+                .uri(new URI(apiEndpoint))
                 .header("Accept", "application/json")
                 .GET()
                 .build();
-
-        HttpResponse<String> getResponse = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString());
-
-        return gson.fromJson(getResponse.body(), Transcript.class);
-    }
-
-    public ResponseEntity<HttpStatus> notFound() {
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        return httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString());
     }
 }
