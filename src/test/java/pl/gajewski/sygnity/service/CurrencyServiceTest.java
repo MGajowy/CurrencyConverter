@@ -56,7 +56,6 @@ class CurrencyServiceTest {
         // given
         Currency currency = getCurrency();
         currency.setConversionDate("2022-10-09");
-
         // when
         ResponseEntity<String> actual = currencyService.convert(currency);
         // then
@@ -101,6 +100,7 @@ class CurrencyServiceTest {
         // when
         ResponseEntity<String> actual = currencyService.convert(currency);
         // then
+        assertThat(actual).isNotNull();
         assertThat(actual.getStatusCodeValue()).isEqualTo(404);
     }
 
@@ -131,6 +131,5 @@ class CurrencyServiceTest {
         currency.setConversionDate("2022-10-10");
         return currency;
     }
-
 }
 

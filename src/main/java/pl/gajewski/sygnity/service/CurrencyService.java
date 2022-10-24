@@ -108,18 +108,18 @@ public class CurrencyService implements CurrencyApiNbp {
 
     @Transactional
     private void saveCurrencyToDB(Transcript currency) {
-        CurrencyOB ob = new CurrencyOB();
-        ob.setCode(currency.getCode());
+        CurrencyOB currencyOB = new CurrencyOB();
+        currencyOB.setCode(currency.getCode());
         for (Rate rate : currency.getRates()) {
-            ob.setEffectiveDate(rate.getEffectiveDate());
-            ob.setMid(rate.getMid());
+            currencyOB.setEffectiveDate(rate.getEffectiveDate());
+            currencyOB.setMid(rate.getMid());
             currencyPrice = rate.getMid();
         }
-        repo.save(ob);
+        repo.save(currencyOB);
     }
 
     private boolean validation(Currency currencyRequest) {
-        if (!currencyRequest.getSourceCurrencyCode().isBlank() && !currencyRequest.getConversionDate().equals("")) {
+        if (!currencyRequest.getSourceCurrencyCode().isBlank() && !currencyRequest.getConversionDate().isBlank()) {
             return currencyRequest.getAmountInSourceCurrency() != null && !currencyRequest.getSourceCurrencyCode().isBlank();
         }
         return false;

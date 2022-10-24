@@ -26,3 +26,9 @@ w body dodaj json:
 "targetCurrencyCode": "USD",
 "conversionDate": "2022-10-13"
 }
+
+# DataBase
+JDBC URL:
+jdbc:h2:mem:./sygnitydb
+
+http://localhost:8080/h2-console/
