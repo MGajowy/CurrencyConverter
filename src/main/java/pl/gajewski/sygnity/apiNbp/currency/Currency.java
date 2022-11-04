@@ -1,4 +1,4 @@
-package pl.gajewski.sygnity.apiNbp;
+package pl.gajewski.sygnity.apiNbp.currency;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 public class Currency {
 
     private String sourceCurrencyCode;
-    private Integer amountInSourceCurrency;
+    private Double amountInSourceCurrency;
     private String targetCurrencyCode;
     private String conversionDate;
 }

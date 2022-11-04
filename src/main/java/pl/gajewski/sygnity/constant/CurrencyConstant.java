@@ -6,4 +6,5 @@ public class CurrencyConstant {
 
     // DB
     public static final String TABLE_CURRENCY = "currency";
+    public static final String TABLE_A_NAME_CURRENCY =  " table_a";
 }

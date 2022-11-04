@@ -1,4 +1,4 @@
-package pl.gajewski.sygnity.apiNbp;
+package pl.gajewski.sygnity.apiNbp.currency;
 
 import lombok.Data;
 
